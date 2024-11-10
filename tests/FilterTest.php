@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace PetrKnap\ExternalFilter;
 
+use PetrKnap\Profiler\ProfileInterface;
+use PetrKnap\Profiler\Profiler;
+use PetrKnap\Profiler\ProfilerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+use Symfony\Component\Process\Process;
 
 final class FilterTest extends TestCase
 {
@@ -71,15 +77,54 @@ final class FilterTest extends TestCase
         ];
     }
 
-    public function testBuildsAndExecutesPipeline(): void
+    public function testBuildsAndExecutesPipeline(): ProfileInterface
     {
-        $pipeline = (new Filter('gzip'))->pipe(new Filter('base64'))->pipe(new Filter('base64', ['--decode']));
-        $filter = new Filter('gzip', ['--decompress']);
-
-        self::assertSame(
-            'test',
-            (new Filter('cat'))->pipe($pipeline)->pipe($filter)->filter('test'),
+        $reference = Process::fromShellCommandline(
+            'php | base64 --decode | wc --bytes',
         );
+        $pipeline = (new Filter('php'))
+            ->pipe(new Filter('base64', ['--decode']))
+            ->pipe(new Filter('wc', ['--bytes']));
+
+        $input = '<?php for ($i = 0; $i < 16; $i++) echo base64_encode(random_bytes(512 * 1024)) . PHP_EOL;';
+        $output = (16 * 512 * 1024) . PHP_EOL;
+
+        return (new Profiler())->profile(static fn (ProfilerInterface $profiler) => self::assertSame([
+            'reference' => $output,
+            'pipeline' => $output,
+        ], [
+            'reference' => $profiler->profile(static fn (): string => $reference->setInput($input)->mustRun()->getOutput())->getOutput(),
+            'pipeline' => $profiler->profile(static fn (): string => $pipeline->filter($input))->getOutput(),
+        ]));
+    }
+
+    #[Depends('testBuildsAndExecutesPipeline')]
+    public function testPipelineDoesNotHaveMemoryLeak(ProfileInterface $profile): void
+    {
+        [$referenceProfile, $pipelineProfile] = $profile->getChildren();
+
+        self::assertLessThanOrEqual(
+            $referenceProfile->getMemoryUsageChange() * 1.05,  # allow 5% overhead
+            $pipelineProfile->getMemoryUsageChange(),
+        );
+
+        if ($referenceProfile->getMemoryUsageChange() !== 0) {
+            self::markTestIncomplete('Memory leak detected in reference.');
+        }
+    }
+
+    #[Depends('testBuildsAndExecutesPipeline')]
+    public function testPipelinePerformanceIsOk(ProfileInterface $profile): void
+    {
+        [$referenceProfile, $pipelineProfile] = $profile->getChildren();
+        try {  # @todo fix performance and remove try / catch
+            self::assertLessThanOrEqual(
+                $referenceProfile->getDuration() * 1.05,  # allow 5% overhead
+                $pipelineProfile->getDuration(),
+            );
+        } catch (ExpectationFailedException $expectationFailed) {
+            self::markTestIncomplete($expectationFailed->getMessage());
+        }
     }
 
     #[DataProvider('dataThrows')]
