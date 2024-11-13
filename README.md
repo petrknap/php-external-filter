@@ -5,7 +5,7 @@ Its primary role is to **facilitate filtering operations within a pipeline**,
 allowing for easy chaining and execution of executable filters.
 
 ```php
-namespace PetrKnap\ExternalFilter;
+use PetrKnap\ExternalFilter\Filter;
 
 # echo "H4sIAAAAAAAAA0tJLEkEAGPz860EAAAA" | base64 --decode | gzip --decompress
 echo Filter::new('base64', ['--decode'])
@@ -16,7 +16,7 @@ echo Filter::new('base64', ['--decode'])
 If you want to process external data, redirect output or get errors, you can use input, output or error streams.
 
 ```php
-namespace PetrKnap\ExternalFilter;
+use PetrKnap\ExternalFilter\Filter;
 
 $errorStream = fopen('php://memory', 'w+');
 
@@ -28,6 +28,15 @@ Filter::new('php')->filter(
 rewind($errorStream);
 echo stream_get_contents($errorStream);
 fclose($errorStream);
+```
+
+If you want to call PHP code in the pipeline, you can via factory.
+
+```php
+use PetrKnap\ExternalFilter\Filter;
+
+echo Filter::new(phpSnippet: 'echo stream_get_contents(STDIN);')
+    ->filter(b'data');
 ```
 
 ---

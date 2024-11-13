@@ -22,6 +22,7 @@ final class ReadmeTest extends TestCase implements MarkdownFileTestInterface
         return [
             'pipeline' => 'data',
             'error-stream' => 'error',
+            'filter-factory' => 'data',
         ];
     }
 }
