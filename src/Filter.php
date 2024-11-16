@@ -4,98 +4,124 @@ declare(strict_types=1);
 
 namespace PetrKnap\ExternalFilter;
 
-use InvalidArgumentException;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
-final class Filter
+/**
+ * @todo make it abstract and remove extends
+ */
+final class Filter extends PipelinableFilter
 {
-    private self|null $previous = null;
-
     /**
+     * @deprecated use {@see self::new()}
+     *
      * @param non-empty-string $command
-     * @param array<non-empty-string> $options
+     * @param array<non-empty-string>|null $options
      */
     public function __construct(
         private readonly string $command,
-        private readonly array $options = [],
+        private readonly array|null $options = null,
     ) {
     }
 
     /**
-     * @param string|resource $input
-     * @param resource|null $output
-     * @param resource|null $error
-     *
-     * @return ($output is null ? string : null)
-     *
-     * @throws Exception\FilterException
+     * @param non-empty-string $command
+     * @param array<non-empty-string>|null $options
      */
-    public function filter(mixed $input, mixed $output = null, mixed $error = null): string|null
+    public static function new(string $command, array|null $options = null): PipelinableFilter
     {
-        if (!is_string($input) && !is_resource($input)) {
-            throw new class ('$input must be string|resource') extends InvalidArgumentException implements Exception\FilterException {
-            };
-        }
-        if ($output !== null && !is_resource($output)) {
-            throw new class ('$output must be resource|null') extends InvalidArgumentException implements Exception\FilterException {
-            };
-        }
-        if ($error !== null && !is_resource($error)) {
-            throw new class ('$error must be resource|null') extends InvalidArgumentException implements Exception\FilterException {
-            };
-        }
-
-        $process = $this->startFilter($input, static function (string $type, string $data) use ($output, $error): void {
-            /** @var Process::OUT|Process::ERR $type */
-            match ($type) {
-                Process::OUT => $output === null or fwrite($output, $data),
-                Process::ERR => $error === null or fwrite($error, $data),
-            };
-        });
-        $process->wait();
-        if (!$process->isSuccessful()) {
-            throw new class ($process) extends ProcessFailedException implements Exception\FilterException {
-            };
-        }
-        return $output === null ? $process->getOutput() : null;
-    }
-
-    public function pipe(self $to): self
-    {
-        $reversedPipeline = [];
-        $head = $to;
-        while ($head !== null) {
-            $reversedPipeline[] = $head;
-            $head = $head->previous;
-        }
-
-        $base = $this;
-        foreach (array_reverse($reversedPipeline) as $next) {
-            $next = new self($next->command, $next->options);
-            $next->previous = $base;
-            $base = $next;
-        }
-
-        return $base;
+        return new Filter($command, $options);
     }
 
     /**
-     * @param string|resource $input
+     * @todo move it to {@see ExternalFilter}
      */
-    private function startFilter(mixed $input, callable|null $callback): Process
+    public function filter(mixed $input, mixed $output = null, mixed $error = null): string|null
     {
-        if ($this->previous !== null) {
-            $input = $this->previous->startFilter($input, null);
+        self::checkFilterArguments(
+            input: $input,
+            output: $output,
+            error: $error,
+        );
+
+        $headlessPipeline = self::transformPipeline($this->buildPipeline());
+        $pipelineHead = array_pop($headlessPipeline);
+        foreach ($headlessPipeline as $filter) {
+            $filter->setInput($input);
+            $filter->start(self::buildProcessCallback(
+                output: null,
+                error: $error,
+            ));
+            $input = $filter;
         }
+        $process = $pipelineHead;
 
-        $process = new Process([
-            $this->command,
-            ...$this->options,
-        ]);
         $process->setInput($input);
-        $process->start($callback);
+        $process->run(self::buildProcessCallback(
+            output: $output,
+            error: $error,
+        ));
+        self::checkFinishedProcess($process);
 
-        return $process;
+        return $output === null ? $process->getOutput() : null;
+    }
+
+    /**
+     * @todo move it to {@see ExternalFilter}
+     */
+    protected function clone(): static
+    {
+        return new self($this->command, $this->options);
+    }
+
+    /**
+     * @todo move it to {@see ExternalFilter}
+     *
+     * @param resource|null $output
+     * @param resource|null $error
+     */
+    private static function buildProcessCallback(mixed $output, mixed $error): callable
+    {
+        return static function (string $type, string $data) use ($output, $error): void {
+            /** @var Process::OUT|Process::ERR $type */
+            match ($type) {
+                Process::OUT => $output === null or fputs($output, $data),
+                Process::ERR => $error === null or fputs($error, $data),
+            };
+        };
+    }
+
+    /**
+     * @todo move it to {@see ExternalFilter}
+     */
+    private static function checkFinishedProcess(Process $finishedProcess): void
+    {
+        if (!$finishedProcess->isSuccessful()) {
+            throw new class ($finishedProcess) extends ProcessFailedException implements Exception\FilterException {
+            };
+        }
+    }
+
+    /**
+     * @todo move it to {@see ExternalFilter}
+     *
+     * @param non-empty-array<PipelinableFilter> $pipeline
+     *
+     * @return non-empty-array<Process>
+     */
+    private static function transformPipeline(array $pipeline): array
+    {
+        $transformedPipeline = [];
+        foreach ($pipeline as $filter) {
+            if ($filter instanceof self) {
+                $transformedPipeline[] = new Process([
+                    $filter->command,
+                    ...($filter->options ?? []),
+                ]);
+            } else {
+                throw new \BadMethodCallException('$pipeline contains unsupported filter');
+            }
+        }
+        return $transformedPipeline;
     }
 }
