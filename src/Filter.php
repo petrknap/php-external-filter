@@ -115,7 +115,7 @@ final class Filter extends PipelinableFilter
         $shellCommandLine = null;
         foreach ($pipeline as $filter) {
             if ($filter instanceof self) {
-                $shellCommandLine = ($shellCommandLine === null ? '' : "{$shellCommandLine} | ") . (new Process([
+                $shellCommandLine .= ($shellCommandLine === null ? '' : ' | ') . (new Process([
                     $filter->command,
                     ...($filter->options ?? []),
                 ]))->getCommandLine();
