@@ -8,11 +8,9 @@ allowing for easy chaining and execution of executable filters.
 namespace PetrKnap\ExternalFilter;
 
 # echo "H4sIAAAAAAAAA0tJLEkEAGPz860EAAAA" | base64 --decode | gzip --decompress
-echo (
-    new Filter('base64', ['--decode'])
-)->pipe(
-    new Filter('gzip', ['--decompress'])
-)->filter('H4sIAAAAAAAAA0tJLEkEAGPz860EAAAA');
+echo Filter::new('base64', ['--decode'])
+    ->pipe(Filter::new('gzip', ['--decompress']))
+    ->filter('H4sIAAAAAAAAA0tJLEkEAGPz860EAAAA');
 ```
 
 If you want to process external data, redirect output or get errors, you can use input, output or error streams.
@@ -22,8 +20,8 @@ namespace PetrKnap\ExternalFilter;
 
 $errorStream = fopen('php://memory', 'w+');
 
-(new Filter('php'))->filter(
-    '<?php fwrite(fopen("php://stderr", "w"), "error");',
+Filter::new('php')->filter(
+    '<?php fputs(fopen("php://stderr", "w"), "error");',
     error: $errorStream,
 );
 
