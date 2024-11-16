@@ -112,15 +112,19 @@ final class Filter extends PipelinableFilter
     private static function transformPipeline(array $pipeline): array
     {
         $transformedPipeline = [];
+        $shellCommandLine = null;
         foreach ($pipeline as $filter) {
             if ($filter instanceof self) {
-                $transformedPipeline[] = new Process([
+                $shellCommandLine = ($shellCommandLine === null ? '' : "{$shellCommandLine} | ") . (new Process([
                     $filter->command,
                     ...($filter->options ?? []),
-                ]);
+                ]))->getCommandLine();
             } else {
                 throw new \BadMethodCallException('$pipeline contains unsupported filter');
             }
+        }
+        if ($shellCommandLine !== null) {
+            $transformedPipeline[] = Process::fromShellCommandline($shellCommandLine);
         }
         return $transformedPipeline;
     }
