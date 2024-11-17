@@ -29,6 +29,8 @@ final class FilterTest extends TestCase
             'PHP file' => [['phpFile' => __DIR__ . '/Some/filter.php']],
             'PHP snippet' => [['phpSnippet' => 'fputs(STDOUT, fgets(STDIN));']],
             'PHP snippet (prefixed)' => [['phpSnippet' => '<?php fputs(STDOUT, fgets(STDIN));']],
+            'Python 3 file' => [['python3File' => __DIR__ . '/Some/filter.py']],
+            'Python 3 snippet' => [['python3Snippet' => "import sys\nsys.stdout.write(sys.stdin.read())"]],
         ];
     }
 
@@ -47,6 +49,8 @@ final class FilterTest extends TestCase
             'command with options and extra' => [['command' => 'cat', 'options' => ['--show-nonprinting'], 'phpFile' => __FILE__]],
             'PHP file with extra' => [['phpFile' => __FILE__, 'options' => []]],
             'PHP snippet with extra' => [['phpSnippet' => 'echo "a";', 'options' => []]],
+            'Python 3 file with extra' => [['python3File' => __FILE__, 'options' => []]],
+            'Python 3 snippet with extra' => [['python3Snippet' => 'print("a")', 'options' => []]],
         ];
     }
 }

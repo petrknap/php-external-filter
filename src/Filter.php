@@ -32,29 +32,31 @@ final class Filter extends PipelinableFilter
      * @param array<non-empty-string>|null $options
      * @param non-empty-string|null $phpFile path to PHP file which consumes {@see STDIN}
      * @param non-empty-string|null $phpSnippet PHP snippet which consumes {@see STDIN}
+     * @param non-empty-string|null $python3File path to Python file which consumes {@see STDIN}
+     * @param non-empty-string|null $python3Snippet Python snippet which consumes {@see STDIN}
      */
     public static function new(
         string|null $command = null,
         array|null $options = null,
         string|null $phpFile = null,
         string|null $phpSnippet = null,
+        string|null $python3File = null,
+        string|null $python3Snippet = null,
     ): PipelinableFilter {
         $arguments = func_get_args();
-        if ($command !== null && self::isNullArray($arguments, 0, 1)) {
-            return new Filter($command, $options);
-        }
-
-        if ($phpFile !== null && self::isNullArray($arguments, 2)) {
-            return new Filter('php', ['-f', $phpFile]);
-        }
-
-        if ($phpSnippet !== null && self::isNullArray($arguments, 3)) {
+        if ($phpSnippet !== null) {
             /** @var non-empty-string $phpSnippet */
             $phpSnippet = (string) preg_replace('/^<\?php\s+/i', '', $phpSnippet);
-            return new Filter('php', ['-r', $phpSnippet]);
         }
 
-        throw new BadMethodCallException(__METHOD__ . ' requires valid combination of arguments');
+        return match (true) {
+            $command !== null && self::isNullArray($arguments, 0, 1) => new Filter($command, $options),
+            $phpFile !== null && self::isNullArray($arguments, 2) => new Filter('php', ['-f', $phpFile]),
+            $phpSnippet !== null && self::isNullArray($arguments, 3) => new Filter('php', ['-r', $phpSnippet]),
+            $python3File !== null && self::isNullArray($arguments, 4) => new Filter('python3', [$python3File]),
+            $python3Snippet !== null && self::isNullArray($arguments, 5) => new Filter('python3', ['-c', $python3Snippet]),
+            default => throw new BadMethodCallException(__METHOD__ . ' requires valid combination of arguments'),
+        };
     }
 
     /**
