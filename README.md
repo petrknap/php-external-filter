@@ -30,12 +30,13 @@ echo stream_get_contents($errorStream);
 fclose($errorStream);
 ```
 
-If you want to call PHP code in the pipeline, you can via factory.
+If you want to call PHP or Python code in the pipeline, you can via factory.
 
 ```php
 use PetrKnap\ExternalFilter\Filter;
 
 echo Filter::new(phpSnippet: 'fputs(STDOUT, fgets(STDIN));')
+    ->pipe(Filter::new(python3File: 'tests/Some/filter.py'))
     ->filter(b'data');
 ```
 
