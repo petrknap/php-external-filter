@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PetrKnap\ExternalFilter;
 
+use BadMethodCallException;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
@@ -25,12 +26,35 @@ final class Filter extends PipelinableFilter
     }
 
     /**
-     * @param non-empty-string $command
+     * @note if you are not creating command filter use named arguments
+     *
+     * @param non-empty-string|null $command
      * @param array<non-empty-string>|null $options
+     * @param non-empty-string|null $phpFile path to PHP file which consumes {@see STDIN}
+     * @param non-empty-string|null $phpSnippet PHP snippet which consumes {@see STDIN}
      */
-    public static function new(string $command, array|null $options = null): PipelinableFilter
-    {
-        return new Filter($command, $options);
+    public static function new(
+        string|null $command = null,
+        array|null $options = null,
+        string|null $phpFile = null,
+        string|null $phpSnippet = null,
+    ): PipelinableFilter {
+        $arguments = func_get_args();
+        if ($command !== null && self::isNullArray($arguments, 0, 1)) {
+            return new Filter($command, $options);
+        }
+
+        if ($phpFile !== null && self::isNullArray($arguments, 2)) {
+            return new Filter('php', ['-f', $phpFile]);
+        }
+
+        if ($phpSnippet !== null && self::isNullArray($arguments, 3)) {
+            /** @var non-empty-string $phpSnippet */
+            $phpSnippet = (string) preg_replace('/^<\?php\s+/i', '', $phpSnippet);
+            return new Filter('php', ['-r', $phpSnippet]);
+        }
+
+        throw new BadMethodCallException(__METHOD__ . ' requires valid combination of arguments');
     }
 
     /**
@@ -120,12 +144,25 @@ final class Filter extends PipelinableFilter
                     ...($filter->options ?? []),
                 ]))->getCommandLine();
             } else {
-                throw new \BadMethodCallException('$pipeline contains unsupported filter');
+                throw new BadMethodCallException('$pipeline contains unsupported filter');
             }
         }
         if ($shellCommandLine !== null) {
             $transformedPipeline[] = Process::fromShellCommandline($shellCommandLine);
         }
         return $transformedPipeline;
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     */
+    private static function isNullArray(array $values, int ...$exceptIndices): bool
+    {
+        foreach ($values as $index => $value) {
+            if ($value !== null && !in_array($index, $exceptIndices, strict: true)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
