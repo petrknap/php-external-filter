@@ -13,15 +13,11 @@ final class FilterTest extends TestCase
     private const INPUT = b'input';
 
     #[DataProvider('dataFactoryWorks')]
-    public function testFactoryWorks(array $arguments): void
+    public function testFactoryWorks(array $factoryArguments): void
     {
-        $filter = Filter::new(...$arguments);
+        $filter = Filter::new(...$factoryArguments);
 
-        self::assertInstanceOf(
-            Filter::class,
-            $filter,
-        );
-
+        self::assertInstanceOf(Filter::class, $filter);
         self::assertSame(self::INPUT, $filter->filter(self::INPUT));
     }
 
@@ -29,6 +25,7 @@ final class FilterTest extends TestCase
     {
         return [
             'command' => [['command' => 'cat']],
+            'command with options' => [['command' => 'cat', 'options' => ['--show-nonprinting']]],
             'PHP file' => [['phpFile' => __DIR__ . '/Some/filter.php']],
             'PHP snippet' => [['phpSnippet' => 'fputs(STDOUT, fgets(STDIN));']],
             'PHP snippet (prefixed)' => [['phpSnippet' => '<?php fputs(STDOUT, fgets(STDIN));']],
@@ -46,10 +43,10 @@ final class FilterTest extends TestCase
     public static function dataFactoryThrowsOnBadMethodCall(): array
     {
         return [
-            'command + extra' => [['command' => 'cat', 'phpFile' => __FILE__]],
-            'command + options + extra' => [['command' => 'cat', 'options' => [], 'phpFile' => __FILE__]],
-            'phpFile + extra' => [['phpFile' => __FILE__, 'options' => []]],
-            'phpSnippet + extra' => [['phpSnippet' => 'echo "a";', 'options' => []]],
+            'command with extra' => [['command' => 'cat', 'phpFile' => __FILE__]],
+            'command with options and extra' => [['command' => 'cat', 'options' => ['--show-nonprinting'], 'phpFile' => __FILE__]],
+            'PHP file with extra' => [['phpFile' => __FILE__, 'options' => []]],
+            'PHP snippet with extra' => [['phpSnippet' => 'echo "a";', 'options' => []]],
         ];
     }
 }

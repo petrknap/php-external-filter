@@ -35,7 +35,7 @@ If you want to call PHP code in the pipeline, you can via factory.
 ```php
 use PetrKnap\ExternalFilter\Filter;
 
-echo Filter::new(phpSnippet: 'echo stream_get_contents(STDIN);')
+echo Filter::new(phpSnippet: 'fputs(STDOUT, fgets(STDIN));')
     ->filter(b'data');
 ```
 
